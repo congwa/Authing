@@ -70,7 +70,7 @@
 
 ORM: SQLAlchemy 2.0 (推荐使用 SQLModel 简化模型定义)
 
-数据库: MySQL 8.0+
+数据库: sqlite 8.0+
 
 数据库迁移: Alembic
 
@@ -84,7 +84,7 @@ ORM: SQLAlchemy 2.0 (推荐使用 SQLModel 简化模型定义)
 
 部署: Docker
 
-5.0 数据库设计 (MySQL)
+5.0 数据库设计 (sqlite)
 数据库包含以下核心表以支持多租户和多应用架构：
 
 ### 5.1 核心业务表
@@ -326,8 +326,8 @@ CREATE TABLE audit_logs (
 
 * **数据库相关**: 
   - **ORM**: SQLAlchemy 2.0 + SQLModel
-  - **数据库**: MySQL 8.0+
-  - **连接池**: aiomysql + asyncio
+  - **数据库**: sqlite 8.0+
+  - **连接池**: asyncio
   - **迁移工具**: Alembic
 
 * **认证安全**:
@@ -575,12 +575,12 @@ jobs:
   backend-test:
     runs-on: ubuntu-latest
     services:
-      mysql:
-        image: mysql:8.0
+      sqlite:
+        image: sqlite:8.0
         env:
-          MYSQL_ROOT_PASSWORD: test
+          sqlite_ROOT_PASSWORD: test
         options: >-
-          --health-cmd="mysqladmin ping"
+          --health-cmd="sqliteadmin ping"
           --health-interval=10s
     steps:
       - uses: actions/checkout@v3
@@ -840,7 +840,7 @@ groups:
           summary: "API错误率过高"
       
       - alert: SlowQueries
-        expr: mysql_slow_queries > 10
+        expr: sqlite_slow_queries > 10
         for: 5m
         labels:
           severity: critical
