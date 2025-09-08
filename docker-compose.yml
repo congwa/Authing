@@ -1,0 +1,113 @@
+# Docker Compose 配置文件
+# 包含前端、后端服务
+
+version: '3.8'
+
+services:
+  # 后端服务
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # 通过构建参数传入宿主机的 UID/GID，避免挂载目录写入权限问题
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+    container_name: authing-backend
+    restart: unless-stopped
+    ports:
+      - "7000:7000"
+    volumes:
+      # 日志文件（宿主机目录挂载，如遇权限问题可改为 named volume：logs:/app/logs）
+      - ./logs:/app/logs
+      # 数据库文件
+      - ./data:/app/data:rw
+      # 环境变量文件
+      - ./.env:/app/.env:ro
+    env_file:
+      - .env
+    environment:
+      # 覆盖特定环境变量（如果需要）
+      - HOST=0.0.0.0
+      - PORT=7000
+      - DATABASE_URL=sqlite:///app/data/authing.db
+    networks:
+      - authing-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # 前端服务
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        - VITE_API_BASE_URL=http://localhost:7000
+    container_name: authing-frontend
+    restart: unless-stopped
+    ports:
+      - "7001:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - authing-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # Nginx 反向代理 (可选，用于生产环境)
+  nginx:
+    image: nginx:alpine
+    container_name: authing-nginx
+    restart: unless-stopped
+    ports:
+      - "7002:80"
+      - "7003:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - authing-network
+    profiles:
+      - production
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+
+networks:
+  authing-network:
+    driver: bridge
+
+volumes:
+  data:
+    driver: local
+  logs:
+    driver: local
